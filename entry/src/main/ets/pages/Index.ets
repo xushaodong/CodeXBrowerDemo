@@ -242,9 +242,9 @@ struct Index {
     .padding({ left: 12, right: 12, bottom: 8 });
   }
 
-  @Builder buildIncognitoHint() {
-    const active: BrowserTabItem = this.getActiveTab();
-    if (active.isIncognito) {
+  @Builder
+  buildIncognitoHint() {
+    if (this.getActiveTab().isIncognito) {
       Row({ space: 8 }) {
         Text('🕶')
           .fontSize(15);
@@ -282,13 +282,12 @@ struct Index {
   }
 
   @Builder buildQuickActions() {
-    const active: BrowserTabItem = this.getActiveTab();
     Row() {
       this.buildActionItem('←', '后退', () => this.webController.backward());
       this.buildActionItem('→', '前进', () => this.webController.forward());
       this.buildActionItem('↻', '刷新', () => this.webController.refresh());
       this.buildActionItem('⌂', '主页', () => this.openUrl('https://www.baidu.com'));
-      this.buildActionItem(active.isIncognito ? '🕶' : '◐', active.isIncognito ? '无痕中' : '无痕', () => this.toggleIncognitoForCurrentTab());
+      this.buildActionItem(this.getActiveTab().isIncognito ? '🕶' : '◐', this.getActiveTab().isIncognito ? '无痕中' : '无痕', () => this.toggleIncognitoForCurrentTab());
       this.buildActionItem('⇩', '下载', () => {
         this.showDownloadPanel = !this.showDownloadPanel;
       });
@@ -508,7 +507,6 @@ struct Index {
   }
 
   @Builder buildSettingsTab() {
-    const active: BrowserTabItem = this.getActiveTab();
     Column({ space: 16 }) {
       Text('设置')
         .fontSize(24)
@@ -533,9 +531,9 @@ struct Index {
         Text('当前会话')
           .fontSize(16)
           .fontColor(this.isDarkMode ? '#E5E5E5' : '#1A1A1A');
-        Text(active.isIncognito ? '无痕模式' : '普通模式')
+        Text(this.getActiveTab().isIncognito ? '无痕模式' : '普通模式')
           .fontSize(13)
-          .fontColor(active.isIncognito ? '#6D8CFF' : '#7D8795');
+          .fontColor(this.getActiveTab().isIncognito ? '#6D8CFF' : '#7D8795');
       }
       .width('100%')
       .padding(12)
