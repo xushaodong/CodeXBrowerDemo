@@ -6,19 +6,34 @@ interface HistoryItem {
   visitTime: string;
 }
 
+interface BrowserTabItem {
+  id: number;
+  title: string;
+  url: string;
+  isIncognito: boolean;
+}
+
 @Entry
 @Component
 struct Index {
   private webController: web_webview.WebviewController = new web_webview.WebviewController();
 
-  @State currentUrl: string = 'https://www.baidu.com';
   @State inputUrl: string = 'https://www.baidu.com';
   @State pageTitle: string = '首页';
   @State historyList: HistoryItem[] = [];
   @State isDarkMode: boolean = false;
+  @State showTabPanel: boolean = false;
+  @State tabs: BrowserTabItem[] = [{
+    id: 1,
+    title: '首页',
+    url: 'https://www.baidu.com',
+    isIncognito: false
+  }];
+  @State activeTabId: number = 1;
+  @State nextTabId: number = 2;
 
   aboutToAppear(): void {
-    this.recordHistory('首页', this.currentUrl);
+    this.recordHistory('首页', 'https://www.baidu.com');
   }
 
   private formatNow(): string {
@@ -30,7 +45,7 @@ struct Index {
   private normalizeUrl(rawUrl: string): string {
     const value: string = rawUrl.trim();
     if (value.length === 0) {
-      return this.currentUrl;
+      return this.getActiveTab().url;
     }
     if (value.startsWith('http://') || value.startsWith('https://')) {
       return value;
@@ -38,16 +53,93 @@ struct Index {
     return `https://${value}`;
   }
 
+  private getActiveTab(): BrowserTabItem {
+    const target: BrowserTabItem | undefined = this.tabs.find((item: BrowserTabItem) => item.id === this.activeTabId);
+    if (target) {
+      return target;
+    }
+    return this.tabs[0];
+  }
+
+  private updateActiveTab(next: BrowserTabItem): void {
+    this.tabs = this.tabs.map((item: BrowserTabItem) => item.id === this.activeTabId ? next : item);
+  }
+
   private openUrl(rawUrl: string): void {
-    const target: string = this.normalizeUrl(rawUrl);
-    this.currentUrl = target;
-    this.inputUrl = target;
+    const active: BrowserTabItem = this.getActiveTab();
+    const targetUrl: string = this.normalizeUrl(rawUrl);
+    const nextTab: BrowserTabItem = {
+      id: active.id,
+      title: this.pageTitle,
+      url: targetUrl,
+      isIncognito: active.isIncognito
+    };
+    this.inputUrl = targetUrl;
+    this.updateActiveTab(nextTab);
     try {
-      this.webController.loadUrl(target);
+      this.webController.loadUrl(targetUrl);
     } catch (error) {
       console.error('LoadUrl Failed', JSON.stringify(error));
     }
-    this.recordHistory(this.pageTitle, target);
+    if (!active.isIncognito) {
+      this.recordHistory(this.pageTitle, targetUrl);
+    }
+  }
+
+  private switchTab(tabId: number): void {
+    this.activeTabId = tabId;
+    const active: BrowserTabItem = this.getActiveTab();
+    this.inputUrl = active.url;
+    this.pageTitle = active.title;
+    this.showTabPanel = false;
+    try {
+      this.webController.loadUrl(active.url);
+    } catch (error) {
+      console.error('SwitchTab loadUrl Failed', JSON.stringify(error));
+    }
+  }
+
+  private addNewTab(isIncognito: boolean): void {
+    const id: number = this.nextTabId;
+    const nextTab: BrowserTabItem = {
+      id: id,
+      title: isIncognito ? '无痕标签页' : '新标签页',
+      url: 'https://www.baidu.com',
+      isIncognito: isIncognito
+    };
+    this.nextTabId = id + 1;
+    this.tabs = [nextTab, ...this.tabs];
+    this.activeTabId = id;
+    this.inputUrl = nextTab.url;
+    this.pageTitle = nextTab.title;
+    this.showTabPanel = false;
+    try {
+      this.webController.loadUrl(nextTab.url);
+    } catch (error) {
+      console.error('AddNewTab loadUrl Failed', JSON.stringify(error));
+    }
+  }
+
+  private removeTab(tabId: number): void {
+    if (this.tabs.length <= 1) {
+      return;
+    }
+    this.tabs = this.tabs.filter((item: BrowserTabItem) => item.id !== tabId);
+    if (this.activeTabId === tabId) {
+      this.activeTabId = this.tabs[0].id;
+      this.switchTab(this.activeTabId);
+    }
+  }
+
+  private toggleIncognitoForCurrentTab(): void {
+    const active: BrowserTabItem = this.getActiveTab();
+    const nextTab: BrowserTabItem = {
+      id: active.id,
+      title: active.title,
+      url: active.url,
+      isIncognito: !active.isIncognito
+    };
+    this.updateActiveTab(nextTab);
   }
 
   private recordHistory(title: string, url: string): void {
@@ -71,6 +163,7 @@ struct Index {
           .layoutWeight(1)
           .height(40)
           .fontSize(14)
+          .fontColor(this.isDarkMode ? '#EFEFEF' : '#1A1A1A')
           .backgroundColor('#00000000')
           .onChange((value: string) => {
             this.inputUrl = value;
@@ -96,8 +189,47 @@ struct Index {
         });
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-    .backgroundColor(this.isDarkMode ? '#1A1A1A' : '#F7F8FA');
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 });
+  }
+
+  @Builder buildTabStrip() {
+    Row({ space: 8 }) {
+      Scroll() {
+        Row({ space: 8 }) {
+          ForEach(this.tabs, (tab: BrowserTabItem) => {
+            Row({ space: 4 }) {
+              Text(tab.isIncognito ? '🕶' : '🌐')
+                .fontSize(12);
+              Text(tab.title)
+                .fontSize(13)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .fontColor(tab.id === this.activeTabId ? '#FFFFFF' : (this.isDarkMode ? '#BBBBBB' : '#4F5966'));
+            }
+            .height(34)
+            .padding({ left: 10, right: 10 })
+            .borderRadius(17)
+            .backgroundColor(tab.id === this.activeTabId ? '#3E7BFA' : (this.isDarkMode ? '#2B2B2B' : '#FFFFFF'))
+            .onClick(() => {
+              this.switchTab(tab.id);
+            });
+          }, (tab: BrowserTabItem) => `${tab.id}`);
+        }
+      }
+      .layoutWeight(1);
+
+      Button('+')
+        .width(34)
+        .height(34)
+        .fontSize(20)
+        .borderRadius(17)
+        .backgroundColor(this.isDarkMode ? '#2B2B2B' : '#FFFFFF')
+        .onClick(() => {
+          this.addNewTab(false);
+        });
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, bottom: 10 });
   }
 
   @Builder buildActionItem(icon: string, title: string, action: () => void) {
@@ -120,11 +252,16 @@ struct Index {
   }
 
   @Builder buildQuickActions() {
+    const active: BrowserTabItem = this.getActiveTab();
     Row() {
       this.buildActionItem('←', '后退', () => this.webController.backward());
       this.buildActionItem('→', '前进', () => this.webController.forward());
       this.buildActionItem('↻', '刷新', () => this.webController.refresh());
       this.buildActionItem('⌂', '主页', () => this.openUrl('https://www.baidu.com'));
+      this.buildActionItem(active.isIncognito ? '🕶' : '◐', active.isIncognito ? '无痕中' : '无痕', () => this.toggleIncognitoForCurrentTab());
+      this.buildActionItem('▦', `${this.tabs.length}页`, () => {
+        this.showTabPanel = !this.showTabPanel;
+      });
     }
     .width('100%')
     .justifyContent(FlexAlign.SpaceAround)
@@ -134,20 +271,100 @@ struct Index {
     .backgroundColor(this.isDarkMode ? '#242424' : '#FFFFFF');
   }
 
+  @Builder buildTabManagerPanel() {
+    if (this.showTabPanel) {
+      Column({ space: 10 }) {
+        Row() {
+          Text('标签管理')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.isDarkMode ? '#F0F0F0' : '#1F2630');
+          Blank();
+          Button('新建无痕')
+            .height(30)
+            .fontSize(12)
+            .backgroundColor(this.isDarkMode ? '#3A3A3A' : '#ECF2FF')
+            .fontColor(this.isDarkMode ? '#E6E6E6' : '#2E5EEA')
+            .onClick(() => {
+              this.addNewTab(true);
+            });
+        }
+        .width('100%');
+
+        List({ space: 8 }) {
+          ForEach(this.tabs, (tab: BrowserTabItem) => {
+            ListItem() {
+              Row() {
+                Column({ space: 4 }) {
+                  Text(`${tab.isIncognito ? '无痕' : '普通'} · ${tab.title}`)
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(this.isDarkMode ? '#F2F2F2' : '#1F2630')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis });
+                  Text(tab.url)
+                    .fontSize(12)
+                    .fontColor(this.isDarkMode ? '#9E9E9E' : '#64707D')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis });
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+                .onClick(() => {
+                  this.switchTab(tab.id);
+                });
+
+                Button('✕')
+                  .width(28)
+                  .height(28)
+                  .fontSize(12)
+                  .backgroundColor(this.isDarkMode ? '#3A3A3A' : '#EDF1F7')
+                  .onClick(() => {
+                    this.removeTab(tab.id);
+                  });
+              }
+              .padding(10)
+              .borderRadius(12)
+              .backgroundColor(tab.id === this.activeTabId ? '#DCE7FF' : (this.isDarkMode ? '#272727' : '#FFFFFF'));
+            }
+          }, (tab: BrowserTabItem) => `${tab.id}`);
+        }
+        .height(220);
+      }
+      .width('100%')
+      .padding(12)
+      .margin({ left: 12, right: 12, bottom: 10 })
+      .borderRadius(16)
+      .backgroundColor(this.isDarkMode ? '#1F1F1F' : '#F8FAFF');
+    }
+  }
+
   @Builder buildBrowserTab() {
     Column() {
       this.buildTopBar();
+      this.buildTabStrip();
 
-      Web({ src: this.currentUrl, controller: this.webController })
+      Web({ src: this.getActiveTab().url, controller: this.webController })
         .layoutWeight(1)
         .domStorageAccess(true)
         .onTitleReceive((event) => {
           if (event) {
             this.pageTitle = event.title;
-            this.recordHistory(event.title, this.currentUrl);
+            const active: BrowserTabItem = this.getActiveTab();
+            const nextTab: BrowserTabItem = {
+              id: active.id,
+              title: event.title,
+              url: active.url,
+              isIncognito: active.isIncognito
+            };
+            this.updateActiveTab(nextTab);
+            if (!active.isIncognito) {
+              this.recordHistory(event.title, active.url);
+            }
           }
         });
 
+      this.buildTabManagerPanel();
       this.buildQuickActions();
     }
     .width('100%')
