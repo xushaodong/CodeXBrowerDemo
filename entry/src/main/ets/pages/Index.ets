@@ -23,7 +23,7 @@ struct Index {
 
   private formatNow(): string {
     const date: Date = new Date();
-    const pad = (value: number): string => value < 10 ? `0${value}` : `${value}`;
+    const pad = (val: number): string => val < 10 ? `0${val}` : `${val}`;
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
@@ -42,20 +42,25 @@ struct Index {
     const target: string = this.normalizeUrl(rawUrl);
     this.currentUrl = target;
     this.inputUrl = target;
-    this.webController.loadUrl(target);
+    try {
+      this.webController.loadUrl(target);
+    } catch (error) {
+      console.error('LoadUrl Failed', JSON.stringify(error));
+    }
     this.recordHistory(this.pageTitle, target);
   }
 
   private recordHistory(title: string, url: string): void {
-    const currentTitle: string = title && title.trim().length > 0 ? title : '未知页面';
+    const currentTitle: string = (title && title.trim().length > 0) ? title : '未知页面';
+    const filtered: HistoryItem[] = this.historyList.filter((item: HistoryItem) => item.url !== url);
     this.historyList = [{
       title: currentTitle,
       url: url,
       visitTime: this.formatNow()
-    }, ...this.historyList.filter((item: HistoryItem) => item.url !== url)];
+    }, ...filtered];
   }
 
-  private buildTopBar(): void {
+  @Builder buildTopBar() {
     Row({ space: 8 }) {
       TextInput({ text: this.inputUrl, placeholder: '输入网址或关键词' })
         .height(42)
@@ -64,8 +69,8 @@ struct Index {
         .onChange((value: string) => {
           this.inputUrl = value;
         })
-        .onSubmit((value: string) => {
-          this.openUrl(value);
+        .onSubmit(() => {
+          this.openUrl(this.inputUrl);
         });
 
       Button('访问')
@@ -74,60 +79,48 @@ struct Index {
           this.openUrl(this.inputUrl);
         });
     }
+    .width('100%')
     .padding({ left: 12, right: 12, top: 12, bottom: 6 });
   }
 
-  private buildQuickActions(): void {
+  @Builder buildQuickActions() {
     Row({ space: 8 }) {
-      Button('后退')
-        .type(ButtonType.Capsule)
-        .onClick(() => {
-          this.webController.backward();
-        });
-
-      Button('前进')
-        .type(ButtonType.Capsule)
-        .onClick(() => {
-          this.webController.forward();
-        });
-
-      Button('刷新')
-        .type(ButtonType.Capsule)
-        .onClick(() => {
-          this.webController.refresh();
-        });
-
-      Button('主页')
-        .type(ButtonType.Capsule)
-        .onClick(() => {
-          this.openUrl('https://www.baidu.com');
-        });
+      Button('后退').type(ButtonType.Capsule).onClick(() => this.webController.backward());
+      Button('前进').type(ButtonType.Capsule).onClick(() => this.webController.forward());
+      Button('刷新').type(ButtonType.Capsule).onClick(() => this.webController.refresh());
+      Button('主页').type(ButtonType.Capsule).onClick(() => this.openUrl('https://www.baidu.com'));
     }
-    .justifyContent(FlexAlign.SpaceBetween)
+    .width('100%')
+    .justifyContent(FlexAlign.SpaceAround)
     .padding({ left: 12, right: 12, bottom: 8 });
   }
 
-  private buildBrowserTab(): void {
+  @Builder buildBrowserTab() {
     Column() {
       this.buildTopBar();
       this.buildQuickActions();
 
       Web({ src: this.currentUrl, controller: this.webController })
         .layoutWeight(1)
-        .onTitleReceive((title: string) => {
-          this.pageTitle = title;
-          this.recordHistory(title, this.currentUrl);
+        .domStorageAccess(true)
+        .onTitleReceive((event) => {
+          if (event) {
+            this.pageTitle = event.title;
+            this.recordHistory(event.title, this.currentUrl);
+          }
         });
     }
+    .width('100%')
     .height('100%');
   }
 
-  private buildHistoryTab(): void {
+  @Builder buildHistoryTab() {
     Column() {
       Row() {
         Text(`历史记录 (${this.historyList.length})`)
           .fontSize(20)
-          .fontWeight(FontWeight.Bold);
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.isDarkMode ? '#E5E5E5' : '#1A1A1A');
 
         Blank();
 
@@ -137,6 +130,7 @@ struct Index {
             this.historyList = [];
           });
       }
+      .width('100%')
       .padding(12);
 
       List({ space: 8 }) {
@@ -146,99 +140,79 @@ struct Index {
               Text(item.title)
                 .fontSize(16)
                 .fontWeight(FontWeight.Medium)
+                .fontColor(this.isDarkMode ? '#E5E5E5' : '#1A1A1A')
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis });
               Text(item.url)
                 .fontSize(13)
-                .opacity(0.7)
+                .fontColor(this.isDarkMode ? '#999999' : '#666666')
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis });
               Text(item.visitTime)
                 .fontSize(12)
-                .opacity(0.55);
+                .fontColor(this.isDarkMode ? '#666666' : '#999999');
             }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
             .padding(12)
             .backgroundColor(this.isDarkMode ? '#2B2B2B' : '#FFFFFF')
             .borderRadius(12)
             .onClick(() => {
               this.openUrl(item.url);
             });
-          };
-        }, (item: HistoryItem) => item.url);
+          }
+        }, (item: HistoryItem) => item.url + item.visitTime);
       }
       .layoutWeight(1)
       .padding({ left: 12, right: 12, bottom: 12 });
     }
+    .width('100%')
     .height('100%');
   }
 
-  private buildSettingsTab(): void {
+  @Builder buildSettingsTab() {
     Column({ space: 16 }) {
       Text('设置')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
+        .fontColor(this.isDarkMode ? '#E5E5E5' : '#1A1A1A')
         .width('100%');
 
       Row() {
-        Text('暗黑主题')
-          .fontSize(16);
+        Text('暗黑主题').fontSize(16).fontColor(this.isDarkMode ? '#E5E5E5' : '#1A1A1A');
         Blank();
         Toggle({ type: ToggleType.Switch, isOn: this.isDarkMode })
           .onChange((isOn: boolean) => {
             this.isDarkMode = isOn;
           });
       }
+      .width('100%')
       .padding(12)
       .borderRadius(12)
       .backgroundColor(this.isDarkMode ? '#2B2B2B' : '#FFFFFF');
-
-      Row() {
-        Text('默认搜索引擎')
-          .fontSize(16);
-        Blank();
-        Text('百度')
-          .opacity(0.6);
-      }
-      .padding(12)
-      .borderRadius(12)
-      .backgroundColor(this.isDarkMode ? '#2B2B2B' : '#FFFFFF');
-
-      Row() {
-        Text('版本信息')
-          .fontSize(16);
-        Blank();
-        Text('Harmony Browser 1.0.0')
-          .opacity(0.6);
-      }
-      .padding(12)
-      .borderRadius(12)
-      .backgroundColor(this.isDarkMode ? '#2B2B2B' : '#FFFFFF');
-
-      Blank();
     }
     .padding(12)
+    .width('100%')
     .height('100%');
   }
 
-  build(): void {
+  build() {
     Column() {
       Tabs({ barPosition: BarPosition.End }) {
         TabContent() {
           this.buildBrowserTab();
-        }
-        .tabBar('浏览');
+        }.tabBar('浏览');
 
         TabContent() {
           this.buildHistoryTab();
-        }
-        .tabBar('历史');
+        }.tabBar('历史');
 
         TabContent() {
           this.buildSettingsTab();
-        }
-        .tabBar('设置');
+        }.tabBar('设置');
       }
       .barMode(BarMode.Fixed)
+      .layoutWeight(1)
       .vertical(false)
       .backgroundColor(this.isDarkMode ? '#1A1A1A' : '#F2F3F5');
     }
