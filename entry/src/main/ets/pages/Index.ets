@@ -62,43 +62,81 @@ struct Index {
 
   @Builder buildTopBar() {
     Row({ space: 8 }) {
-      TextInput({ text: this.inputUrl, placeholder: '输入网址或关键词' })
-        .height(42)
-        .layoutWeight(1)
-        .fontSize(14)
-        .onChange((value: string) => {
-          this.inputUrl = value;
-        })
-        .onSubmit(() => {
-          this.openUrl(this.inputUrl);
-        });
+      Row({ space: 8 }) {
+        Text('🔍')
+          .fontSize(16)
+          .opacity(0.6);
 
-      Button('访问')
-        .height(42)
+        TextInput({ text: this.inputUrl, placeholder: '搜索或输入网址' })
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(14)
+          .backgroundColor('#00000000')
+          .onChange((value: string) => {
+            this.inputUrl = value;
+          })
+          .onSubmit(() => {
+            this.openUrl(this.inputUrl);
+          });
+      }
+      .layoutWeight(1)
+      .height(44)
+      .padding({ left: 12, right: 8 })
+      .borderRadius(22)
+      .backgroundColor(this.isDarkMode ? '#2D2D2D' : '#FFFFFF');
+
+      Button('前往')
+        .height(44)
+        .fontSize(14)
+        .padding({ left: 14, right: 14 })
+        .backgroundColor('#3E7BFA')
+        .fontColor('#FFFFFF')
         .onClick(() => {
           this.openUrl(this.inputUrl);
         });
     }
     .width('100%')
-    .padding({ left: 12, right: 12, top: 12, bottom: 6 });
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+    .backgroundColor(this.isDarkMode ? '#1A1A1A' : '#F7F8FA');
+  }
+
+  @Builder buildActionItem(icon: string, title: string, action: () => void) {
+    Column({ space: 6 }) {
+      Button(icon)
+        .width(46)
+        .height(46)
+        .fontSize(20)
+        .borderRadius(23)
+        .backgroundColor(this.isDarkMode ? '#323232' : '#EEF3FF')
+        .onClick(() => {
+          action();
+        });
+
+      Text(title)
+        .fontSize(12)
+        .fontColor(this.isDarkMode ? '#B9B9B9' : '#5B6470');
+    }
+    .width(64);
   }
 
   @Builder buildQuickActions() {
-    Row({ space: 8 }) {
-      Button('后退').type(ButtonType.Capsule).onClick(() => this.webController.backward());
-      Button('前进').type(ButtonType.Capsule).onClick(() => this.webController.forward());
-      Button('刷新').type(ButtonType.Capsule).onClick(() => this.webController.refresh());
-      Button('主页').type(ButtonType.Capsule).onClick(() => this.openUrl('https://www.baidu.com'));
+    Row() {
+      this.buildActionItem('←', '后退', () => this.webController.backward());
+      this.buildActionItem('→', '前进', () => this.webController.forward());
+      this.buildActionItem('↻', '刷新', () => this.webController.refresh());
+      this.buildActionItem('⌂', '主页', () => this.openUrl('https://www.baidu.com'));
     }
     .width('100%')
     .justifyContent(FlexAlign.SpaceAround)
-    .padding({ left: 12, right: 12, bottom: 8 });
+    .padding({ left: 8, right: 8, top: 10, bottom: 12 })
+    .margin({ left: 12, right: 12, bottom: 10 })
+    .borderRadius(18)
+    .backgroundColor(this.isDarkMode ? '#242424' : '#FFFFFF');
   }
 
   @Builder buildBrowserTab() {
     Column() {
       this.buildTopBar();
-      this.buildQuickActions();
 
       Web({ src: this.currentUrl, controller: this.webController })
         .layoutWeight(1)
@@ -109,6 +147,8 @@ struct Index {
             this.recordHistory(event.title, this.currentUrl);
           }
         });
+
+      this.buildQuickActions();
     }
     .width('100%')
     .height('100%');
