@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "Harmony Browser"
+    },
+    {
+      "name": "module_desc",
+      "value": "Harmony browser demo module"
+    },
+    {
+      "name": "entry_desc",
+      "value": "Main entry ability"
+    }
+  ]
+}
